@@ -42,18 +42,25 @@ def generate_mock_measurement(station_id: int, date_time: datetime) -> Dict[str,
         "wind_speed": round(random.uniform(0.5, 10.0), 1),
     }
 
-def generate_histo    def generate_historical_data(station_id: int, days: int = 7) -> List[Dict[str, Any]]:
-        """Gera dados históricos mock para uma estação."""
-        data = []
-        end_date = datetime.now().replace(minute=0, second=0, microsecond=0)
-        start_date = end_date - timedelta(days=days)
-        
-        current_date = start_date
-        while current_date <= end_date:
-            data.append(generate_mock_measurement(station_id, current_date))
-            current_date += timedelta(hours=1)
-            
-        return data
+def generate_historical_data(station_id: int, days: int = 7) -> List[Dict[str, Any]]:
+    end = datetime.now()
+    start = end - timedelta(days=days)
+    series: List[Dict[str, Any]] = []
+    for i in range(days):
+        when = start + timedelta(days=i)
+        series.append({
+            "station_id": station_id,
+            "date": when.date().isoformat(),
+            "pm25": random.uniform(5, 60),
+            "pm10": random.uniform(10, 120),
+            "o3": random.uniform(10, 200),
+            "no2": random.uniform(5, 150),
+            "so2": random.uniform(2, 50),
+            "co": random.uniform(0.1, 2.0),
+            "aqi": random.randint(0, 200),
+        })
+    return series
+
     
     MOCK_HISTORICAL_DATA = {}
     for station in MOCK_STATIONS:
@@ -103,7 +110,7 @@ def generate_histo    def generate_historical_data(station_id: int, days: int = 
                 
             return analysis
     
-    mock_db = MockDB()ata
+    mock_db = MockDB()
 
 # Instância global do MockDB
 mock_db = MockDB()

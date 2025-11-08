@@ -1,17 +1,19 @@
 """
-Rota para análise de dados de qualidade do ar usando LLM.
+Rota para análise de dados de qualidade do ar usando LLM (Gemini).
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import os
-from openai import OpenAI
+import google.generativeai as genai
 
 router = APIRouter()
 
-# Inicializar cliente OpenAI
-client = OpenAI()
+# Configurar Gemini
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 class AirQualityAnalysisRequest(BaseModel):
@@ -32,7 +34,7 @@ class AirQualityAnalysisResponse(BaseModel):
 @router.post("/analyze", response_model=AirQualityAnalysisResponse)
 async def analyze_air_quality(request: AirQualityAnalysisRequest):
     """
-    Analisa dados de qualidade do ar usando LLM e retorna recomendações.
+    Analisa dados de qualidade do ar usando LLM (Gemini) e retorna recomendações.
     
     Args:
         request: Dados de qualidade do ar para análise
@@ -41,6 +43,13 @@ async def analyze_air_quality(request: AirQualityAnalysisRequest):
         Análise e recomendações geradas pelo LLM
     """
     try:
+        # Verificar se a API key está configurada
+        if not GEMINI_API_KEY:
+            raise HTTPException(
+                status_code=500,
+                detail="GEMINI_API_KEY não configurada"
+            )
+        
         # Construir prompt com os dados
         prompt = f"""Analise os seguintes dados de qualidade do ar para a cidade de {request.city}:
 
@@ -61,25 +70,12 @@ Por favor, forneça:
 
 Seja direto e objetivo."""
 
-        # Chamar LLM
-        response = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Você é um especialista em qualidade do ar e saúde pública. Forneça análises claras e recomendações práticas baseadas nos dados de poluição do ar."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.7,
-            max_tokens=300
-        )
+        # Chamar Gemini
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content(prompt)
         
         # Extrair resposta
-        llm_response = response.choices[0].message.content
+        llm_response = response.text
         
         # Separar análise e recomendações (formato simples)
         parts = llm_response.split("\n\n")
@@ -106,28 +102,30 @@ Seja direto e objetivo."""
 @router.get("/test")
 async def test_llm():
     """
-    Endpoint de teste para verificar se o LLM está funcionando.
+    Endpoint de teste para verificar se o LLM (Gemini) está funcionando.
     """
     try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Responda apenas 'OK' se você está funcionando."
-                }
-            ],
-            max_tokens=10
-        )
+        # Verificar se a API key está configurada
+        if not GEMINI_API_KEY:
+            return {
+                "status": "error",
+                "message": "GEMINI_API_KEY não configurada",
+                "response": None
+            }
+        
+        # Testar Gemini
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content("Responda apenas 'OK - Gemini funcionando!' se você está operacional.")
         
         return {
             "status": "success",
-            "message": "LLM está funcionando corretamente",
-            "response": response.choices[0].message.content
+            "message": "Gemini está funcionando corretamente",
+            "response": response.text,
+            "model": "gemini-1.5-flash"
         }
         
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao testar LLM: {str(e)}"
+            detail=f"Erro ao testar Gemini: {str(e)}"
         )

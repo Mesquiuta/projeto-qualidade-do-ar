@@ -26,8 +26,9 @@ class Pagination(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Envelope de erro padrão."""
-    error: bool = Field(True, const=True)
+    """Envelope de erro padrão (compatível com Pydantic v2)."""
+    # const=True foi removido no v2 → usar Literal[True]
+    error: Literal[True] = True
     message: str
     status_code: int
     details: Optional[Dict[str, Any]] = None

@@ -1,266 +1,388 @@
-"""
-Schemas de respostas da API.
-"""
+# src/api/schemas/responses.py
+from __future__ import annotations
 
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, date
 from enum import Enum
+from pydantic import BaseModel, Field, ConfigDict
 
 
-class QualityLevel(str, Enum):
-    """
-    Níveis de qualidade do ar.
-    """
-    EXCELENTE = "excelente"
-    BOA = "boa"
-    MODERADA = "moderada"
-    RUIM = "ruim"
-    MUITO_RUIM = "muito_ruim"
-    PERIGOSA = "perigosa"
+# ============================================================
+# Utilitários e abstrações comuns
+# ============================================================
 
+class Pagination(BaseModel):
+    """Metadados de paginação padronizados."""
+    page: int = Field(1, ge=1, description="Página atual (1-indexed).")
+    per_page: int = Field(20, ge=1, le=200, description="Itens por página.")
+    total: int = Field(0, ge=0, description="Total de registros.")
+    total_pages: int = Field(0, ge=0, description="Total de páginas.")
 
-class PollutantPrediction(BaseModel):
-    """
-    Predição para um poluente específico.
-    """
-    valor: float = Field(..., description="Valor predito do poluente")
-    unidade: str = Field(..., description="Unidade de medida")
-    nivel_qualidade: QualityLevel = Field(..., description="Nível de qualidade")
-    confianca: Optional[float] = Field(None, ge=0, le=1, description="Nível de confiança da predição")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "valor": 25.5,
-                "unidade": "µg/m³",
-                "nivel_qualidade": "moderada",
-                "confianca": 0.85
-            }
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"page": 1, "per_page": 20, "total": 120, "total_pages": 6}
         }
-
-
-class PredictionResponse(BaseModel):
-    """
-    Resposta de predição da qualidade do ar.
-    """
-    cidade: str = Field(..., description="Nome da cidade")
-    data_predicao: date = Field(..., description="Data da predição")
-    timestamp: datetime = Field(..., description="Timestamp da predição")
-    
-    class StationResponse(BaseModel):
-        """
-        Informações sobre uma estação de monitoramento.
-        """
-        id: int = Field(..., description="ID da estação")
-        name: str = Field(..., description="Nome da estação")
-        latitude: float = Field(..., description="Latitude da estação")
-        longitude: float = Field(..., description="Longitude da estação")
-        city: str = Field(..., description="Cidade da estação")
-        state: str = Field(..., description="Estado da estação")
-        country: str = Field(..., description="País da estação")
-        
-        class Config:
-            schema_extra = {
-                "example": {
-                    "id": 1,
-                    "name": "Estação Centro",
-                    "latitude": -23.5505,
-                    "longitude": -46.6333,
-                    "city": "São Paulo",
-                    "state": "SP",
-                    "country": "BR"
-                }
-            }
-    
-    # Poluentes principais
-    pm25: PollutantPrediction = Field(..., description="Predição para PM2.5")
-    pm10: Optional[PollutantPrediction] = Field(None, description="Predição para PM10")
-    no2: Optional[PollutantPrediction] = Field(None, description="Predição para NO2")
-    o3: Optional[PollutantPrediction] = Field(None, description="Predição para O3")
-    co: Optional[PollutantPrediction] = Field(None, description="Predição para CO")
-    so2: Optional[PollutantPrediction] = Field(None, description="Predição para SO2")
-    
-    # Qualidade geral
-    qualidade_geral: QualityLevel = Field(..., description="Qualidade geral do ar")
-    indice_qualidade: float = Field(..., ge=0, le=500, description="Índice de qualidade do ar (0-500)")
-    
-    # Metadados
-    modelo_versao: str = Field(..., description="Versão do modelo utilizado")
-    confianca_geral: float = Field(..., ge=0, le=1, description="Confiança geral da predição")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "cidade": "São Paulo",
-                "data_predicao": "2024-01-15",
-                "timestamp": "2024-01-15T10:30:00Z",
-                "pm25": {
-                    "valor": 25.5,
-                    "unidade": "µg/m³",
-                    "nivel_qualidade": "moderada",
-                    "confianca": 0.85
-                },
-                "pm10": {
-                    "valor": 45.2,
-                    "unidade": "µg/m³",
-                    "nivel_qualidade": "moderada",
-                    "confianca": 0.82
-                },
-                "qualidade_geral": "moderada",
-                "indice_qualidade": 75.5,
-                "modelo_versao": "1.0.0",
-                "confianca_geral": 0.83
-            }
-        }
-
-
-class BatchPredictionResponse(BaseModel):
-    """
-    Resposta para predições em lote.
-    """
-    cidade: str = Field(..., description="Nome da cidade")
-    total_predicoes: int = Field(..., description="Número total de predições")
-    predicoes: List[PredictionResponse] = Field(..., description="Lista de predições")
-    tempo_processamento: float = Field(..., description="Tempo de processamento em segundos")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "cidade": "São Paulo",
-                "total_predicoes": 2,
-                "predicoes": [
-                    {
-                        "cidade": "São Paulo",
-                        "data_predicao": "2024-01-15",
-                        "timestamp": "2024-01-15T10:30:00Z",
-                        "pm25": {
-                            "valor": 25.5,
-                            "unidade": "µg/m³",
-                            "nivel_qualidade": "moderada",
-                            "confianca": 0.85
-                        },
-                        "qualidade_geral": "moderada",
-                        "indice_qualidade": 75.5,
-                        "modelo_versao": "1.0.0",
-                        "confianca_geral": 0.83
-                    }
-                ],
-                "tempo_processamento": 0.25
-            }
-        }
-
-
-class HistoricalDataPoint(BaseModel):
-    """
-    Ponto de dados históricos.
-    """
-    data: date = Field(..., description="Data do registro")
-    poluentes: Dict[str, float] = Field(..., description="Valores dos poluentes")
-    clima: Optional[Dict[str, float]] = Field(None, description="Dados climáticos")
-    qualidade: Optional[QualityLevel] = Field(None, description="Nível de qualidade")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "data": "2024-01-15",
-                "poluentes": {
-                    "pm25": 25.5,
-                    "pm10": 45.2,
-                    "no2": 35.8
-                },
-                "clima": {
-                    "temperatura": 25.5,
-                    "umidade": 65.0,
-                    "vento_velocidade": 15.2
-                },
-                "qualidade": "moderada"
-            }
-        }
-
-
-class HistoricalDataResponse(BaseModel):
-    """
-    Resposta de dados históricos.
-    """
-    cidade: str = Field(..., description="Nome da cidade")
-    periodo: Dict[str, date] = Field(..., description="Período dos dados")
-    total_registros: int = Field(..., description="Número total de registros")
-    dados: List[HistoricalDataPoint] = Field(..., description="Dados históricos")
-    estatisticas: Optional[Dict[str, Any]] = Field(None, description="Estatísticas dos dados")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "cidade": "São Paulo",
-                "periodo": {
-                    "inicio": "2024-01-01",
-                    "fim": "2024-01-31"
-                },
-                "total_registros": 31,
-                "dados": [
-                    {
-                        "data": "2024-01-15",
-                        "poluentes": {
-                            "pm25": 25.5,
-                            "pm10": 45.2
-                        },
-                        "qualidade": "moderada"
-                    }
-                ],
-                "estatisticas": {
-                    "pm25_media": 23.8,
-                    "pm25_max": 45.2,
-                    "pm25_min": 12.1
-                }
-            }
-        }
-
-
-class HealthResponse(BaseModel):
-    """
-    Resposta de status de saúde da API.
-    """
-    status: str = Field(..., description="Status da API")
-    timestamp: datetime = Field(..., description="Timestamp da verificação")
-    versao: str = Field(..., description="Versão da API")
-    modelo_carregado: bool = Field(..., description="Status do carregamento do modelo")
-    banco_conectado: bool = Field(..., description="Status da conexão com banco")
-    uptime: float = Field(..., description="Tempo de atividade em segundos")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "status": "healthy",
-                "timestamp": "2024-01-15T10:30:00Z",
-                "versao": "1.0.0",
-                "modelo_carregado": True,
-                "banco_conectado": True,
-                "uptime": 3600.5
-            }
-        }
+    )
 
 
 class ErrorResponse(BaseModel):
-    """
-    Resposta de erro padrão.
-    """
-    error: bool = Field(True, description="Indica se é uma resposta de erro")
-    message: str = Field(..., description="Mensagem de erro")
-    status_code: int = Field(..., description="Código de status HTTP")
-    details: Optional[Dict[str, Any]] = Field(None, description="Detalhes adicionais do erro")
-    timestamp: datetime = Field(..., description="Timestamp do erro")
-    
-    class Config:
-        schema_extra = {
+    """Envelope de erro padrão."""
+    error: bool = Field(True, const=True)
+    message: str
+    status_code: int
+    details: Optional[Dict[str, Any]] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": True,
-                "message": "Dados de entrada inválidos",
-                "status_code": 400,
-                "details": {
-                    "field": "temperatura",
-                    "issue": "Valor fora do intervalo permitido"
-                },
-                "timestamp": "2024-01-15T10:30:00Z"
+                "message": "Recurso não encontrado",
+                "status_code": 404,
+                "details": {"resource": "station", "id": 999},
+                "timestamp": "2024-01-15T12:00:00Z",
             }
         }
+    )
+
+
+# ============================================================
+# Estações
+# ============================================================
+
+class StationResponse(BaseModel):
+    """Representação pública de uma estação de monitoramento."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Identificador da estação")
+    name: str = Field(..., description="Nome da estação")
+    latitude: float = Field(..., description="Latitude em graus decimais")
+    longitude: float = Field(..., description="Longitude em graus decimais")
+    city: str = Field(..., description="Cidade")
+    state: str = Field(..., description="Estado/UF")
+    country: str = Field(..., description="País (ISO-2 ou nome)")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": 1,
+                "name": "Estação Centro",
+                "latitude": -23.5505,
+                "longitude": -46.6333,
+                "city": "São Paulo",
+                "state": "SP",
+                "country": "BR",
+            }
+        },
+    )
+
+
+class StationDetailResponse(StationResponse):
+    """Detalhes opcionais adicionais de uma estação."""
+    installed_at: Optional[date] = Field(None, description="Data de instalação")
+    active: bool = Field(default=True, description="Indicador de atividade")
+    sensors: Optional[List[str]] = Field(
+        None, description="Lista de sensores disponíveis (ex.: pm25, pm10, o3)"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": 1,
+                "name": "Estação Centro",
+                "latitude": -23.5505,
+                "longitude": -46.6333,
+                "city": "São Paulo",
+                "state": "SP",
+                "country": "BR",
+                "installed_at": "2023-04-20",
+                "active": True,
+                "sensors": ["pm25", "pm10", "o3", "no2", "so2", "co"],
+            }
+        }
+    )
+
+
+class StationListResponse(BaseModel):
+    """Lista paginada de estações."""
+    items: List[StationResponse]
+    pagination: Optional[Pagination] = None
+
+
+# ============================================================
+# Saúde / Métricas
+# ============================================================
+
+class HealthResponse(BaseModel):
+    status: Literal["ok", "healthy", "degraded", "down"] = "ok"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    version: str = "1.0.0"
+    model_loaded: bool = True
+    db_connected: bool = True
+    uptime_seconds: float = 0.0
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "ok",
+                "timestamp": "2024-01-15T12:30:00Z",
+                "version": "1.0.0",
+                "model_loaded": True,
+                "db_connected": True,
+                "uptime_seconds": 12345.67,
+            }
+        }
+    )
+
+
+class MetricsResponse(BaseModel):
+    uptime_seconds: float
+    total_requests: int
+    avg_latency_ms: Optional[float] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "uptime_seconds": 45231.4,
+                "total_requests": 10342,
+                "avg_latency_ms": 18.7,
+            }
+        }
+    )
+
+
+# ============================================================
+# Qualidade do Ar / Predições
+# ============================================================
+
+class QualityLevel(str, Enum):
+    EXCELLENT = "excellent"
+    GOOD = "good"
+    MODERATE = "moderate"
+    POOR = "poor"
+    VERY_POOR = "very_poor"
+    HAZARDOUS = "hazardous"
+
+
+class PredictionItem(BaseModel):
+    """Item simples de predição por timestamp."""
+    timestamp: datetime
+    aqi: int
+    pm25: float
+    pm10: float
+    o3: float
+    no2: float
+    so2: float
+    co: float
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "timestamp": "2024-01-15T13:00:00Z",
+                "aqi": 78,
+                "pm25": 22.5,
+                "pm10": 45.3,
+                "o3": 120.1,
+                "no2": 37.4,
+                "so2": 10.2,
+                "co": 0.7,
+            }
+        }
+    )
+
+
+class PredictionResponse(BaseModel):
+    """Predição agregada por estação."""
+    station_id: int
+    items: List[PredictionItem]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "station_id": 1,
+                "items": [
+                    {
+                        "timestamp": "2024-01-15T13:00:00Z",
+                        "aqi": 78,
+                        "pm25": 22.5,
+                        "pm10": 45.3,
+                        "o3": 120.1,
+                        "no2": 37.4,
+                        "so2": 10.2,
+                        "co": 0.7,
+                    }
+                ],
+            }
+        }
+    )
+
+
+class PollutantPrediction(BaseModel):
+    """Predição por poluente com nível de qualidade e confiança."""
+    value: float = Field(..., description="Valor predito")
+    unit: str = Field(..., description="Unidade de medida (ex.: µg/m³)")
+    quality: QualityLevel = Field(..., description="Nível de qualidade do ar")
+    confidence: Optional[float] = Field(None, ge=0, le=1, description="Confiança 0–1")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "value": 25.5,
+                "unit": "µg/m³",
+                "quality": "moderate",
+                "confidence": 0.86,
+            }
+        }
+    )
+
+
+class RichPredictionEnvelope(BaseModel):
+    """Envelope mais rico para /predict quando quiser respostas ‘explicadas’."""
+    city: str
+    station_id: Optional[int] = None
+    predicted_at: datetime = Field(default_factory=datetime.utcnow)
+    date_ref: date = Field(default_factory=date.today)
+    aqi: int
+    overall_quality: QualityLevel
+    pm25: PollutantPrediction
+    pm10: Optional[PollutantPrediction] = None
+    o3: Optional[PollutantPrediction] = None
+    no2: Optional[PollutantPrediction] = None
+    so2: Optional[PollutantPrediction] = None
+    co: Optional[PollutantPrediction] = None
+    model_version: str = "1.0.0"
+    overall_confidence: float = Field(..., ge=0, le=1)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "city": "São Paulo",
+                "station_id": 1,
+                "predicted_at": "2024-01-15T13:15:00Z",
+                "date_ref": "2024-01-15",
+                "aqi": 82,
+                "overall_quality": "moderate",
+                "pm25": {"value": 26.1, "unit": "µg/m³", "quality": "moderate", "confidence": 0.84},
+                "pm10": {"value": 48.2, "unit": "µg/m³", "quality": "moderate", "confidence": 0.81},
+                "model_version": "1.0.0",
+                "overall_confidence": 0.83,
+            }
+        }
+    )
+
+
+class BatchPredictionResponse(BaseModel):
+    city: str
+    total: int
+    predictions: List[RichPredictionEnvelope]
+    processing_time_sec: float
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "city": "São Paulo",
+                "total": 2,
+                "predictions": [],
+                "processing_time_sec": 0.27,
+            }
+        }
+    )
+
+
+# ============================================================
+# Histórico
+# ============================================================
+
+class HistoricalDataPoint(BaseModel):
+    date: date
+    pollutants: Dict[str, float]
+    weather: Optional[Dict[str, float]] = None
+    quality: Optional[QualityLevel] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "date": "2024-01-15",
+                "pollutants": {"pm25": 23.5, "pm10": 41.2, "no2": 30.1},
+                "weather": {"temperature": 26.4, "humidity": 63.0, "wind_speed": 12.5},
+                "quality": "moderate",
+            }
+        }
+    )
+
+
+class HistoricalDataResponse(BaseModel):
+    city: str
+    station_id: Optional[int] = None
+    period: Dict[str, date]  # {"start": date, "end": date}
+    total_records: int
+    data: List[HistoricalDataPoint]
+    stats: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "city": "São Paulo",
+                "station_id": 1,
+                "period": {"start": "2024-01-01", "end": "2024-01-31"},
+                "total_records": 31,
+                "data": [],
+                "stats": {"pm25_mean": 22.8, "pm25_max": 45.2, "pm25_min": 11.7},
+            }
+        }
+    )
+
+
+# ============================================================
+# LLM (se houver rota /llm que devolva algo estruturado)
+# ============================================================
+
+class LLMAnswer(BaseModel):
+    prompt: str
+    answer: str
+    model: str = "gpt"
+    latency_ms: Optional[float] = None
+    meta: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "prompt": "Explique AQI em linguagem simples.",
+                "answer": "AQI é um índice que traduz a qualidade do ar...",
+                "model": "gpt",
+                "latency_ms": 123.4,
+                "meta": {"tokens_in": 123, "tokens_out": 256},
+            }
+        }
+    )
+
+
+# ============================================================
+# Exports explícitos (opcional, mas ajuda a evitar imports quebrados)
+# ============================================================
+
+__all__ = [
+    # util
+    "Pagination",
+    "ErrorResponse",
+    # stations
+    "StationResponse",
+    "StationDetailResponse",
+    "StationListResponse",
+    # health & metrics
+    "HealthResponse",
+    "MetricsResponse",
+    # predictions
+    "QualityLevel",
+    "PredictionItem",
+    "PredictionResponse",
+    "PollutantPrediction",
+    "RichPredictionEnvelope",
+    "BatchPredictionResponse",
+    # historical
+    "HistoricalDataPoint",
+    "HistoricalDataResponse",
+    # llm
+    "LLMAnswer",
+]

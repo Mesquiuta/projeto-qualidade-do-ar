@@ -5,20 +5,19 @@ from datetime import datetime, timedelta
 import random
 import logging
 
+__all__ = ["generate_historical_data", "MockDB", "mock_db"]
+
 log = logging.getLogger(__name__)
 
 
 def generate_historical_data(station_id: int, days: int = 7) -> List[Dict[str, Any]]:
-    """
-    Gera uma série histórica fake para testes.
-    """
+    """Gera uma série histórica fake para testes."""
     if days < 1:
         days = 1
 
     end = datetime.now()
     start = end - timedelta(days=days)
     series: List[Dict[str, Any]] = []
-
     for i in range(days):
         when = start + timedelta(days=i)
         series.append(
@@ -38,10 +37,7 @@ def generate_historical_data(station_id: int, days: int = 7) -> List[Dict[str, A
 
 
 class MockDB:
-    """
-    Banco fake em memória para rotas e testes locais.
-    Ajuste os métodos conforme as chamadas feitas nas rotas.
-    """
+    """Banco fake em memória para rotas e testes locais."""
 
     def __init__(self) -> None:
         self._predictions: List[Dict[str, Any]] = []
@@ -66,7 +62,7 @@ class MockDB:
             },
         ]
 
-    # -------- Estações --------
+    # --- Estações ---
     async def get_stations(self) -> List[Dict[str, Any]]:
         return list(self._stations)
 
@@ -76,12 +72,11 @@ class MockDB:
                 return s
         return None
 
-    # -------- Série histórica --------
+    # --- Séries históricas ---
     async def historical_data(self, station_id: int, days: int = 7) -> List[Dict[str, Any]]:
-        # delega para a função síncrona acima
         return generate_historical_data(station_id, days)
 
-    # -------- Predições --------
+    # --- Predições ---
     async def save_prediction(self, payload: Dict[str, Any]) -> None:
         data = dict(payload)
         data["created_at"] = datetime.utcnow().isoformat()
@@ -92,5 +87,5 @@ class MockDB:
         return list(self._predictions)
 
 
-# instância global usada pelas rotas
+# Instância global (módulo):
 mock_db = MockDB()
